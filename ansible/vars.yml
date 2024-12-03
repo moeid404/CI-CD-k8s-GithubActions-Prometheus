@@ -1,0 +1,4 @@
+port: 22
+user_name: eid
+grafana_port: 3000
+grafana_protocol: http

@@ -1,0 +1,28 @@
+# Node.js
+node_modules/
+npm-debug.log
+yarn-debug.log*
+yarn-error.log*
+
+# Logs
+logs
+*.log
+
+# Local Environment
+.env
+
+# SSH Keys
+ssh_key.pem
+
+# Terraform
+*.tfstate
+*.tfstate.backup
+.terraform/
+.terraform.lock.hcl
+
+# Ansible
+ansible/
+
+# System Files
+.DS_Store
+Thumbs.db

@@ -1,0 +1,61 @@
+- name: Install required packages
+  apt:
+    name:
+      - apt-transport-https
+      - software-properties-common
+      - wget
+    state: present
+
+- name: Create directory for apt keyrings
+  file:
+    path: /etc/apt/keyrings/
+    state: directory
+    mode: '0755'
+
+- name: Ensure sources.list.d directory exists
+  file:
+    path: /etc/apt/sources.list.d/
+    state: directory
+    mode: '0755'
+
+- name: Download Grafana GPG key
+  shell: wget -q -O - https://apt.grafana.com/gpg.key | gpg --dearmor
+  register: grafana_gpg_key
+
+- name: Add Grafana GPG key to keyrings
+  copy:
+    content: "{{ grafana_gpg_key.stdout }}"
+    dest: /etc/apt/keyrings/grafana.gpg
+    mode: '0644'
+
+- name: Add Grafana APT repository
+  copy:
+    dest: /etc/apt/sources.list.d/grafana.list
+    content: "deb [signed-by=/etc/apt/keyrings/grafana.gpg] https://apt.grafana.com stable main\n"
+    mode: '0644'
+
+- name: Update APT package index
+  apt:
+    update_cache: yes
+
+- name: Install Grafana
+  apt:
+    name: grafana
+    state: latest
+
+- name: Ensure protocol is set to http
+  lineinfile:
+    path: /etc/grafana/grafana.ini
+    line: "protocol = {{grafana_protocol}}"
+    state: present
+
+- name: Ensure http_port is set to 3000
+  lineinfile:
+    path: /etc/grafana/grafana.ini
+    line: "http_port = {{grafana_port}}"
+    state: present
+
+- name: Restart Grafana service
+  systemd:
+    name: grafana-server
+    state: restarted

@@ -1,0 +1,29 @@
+- name: change ssh port
+  lineinfile:
+    path: /etc/ssh/sshd_config
+    regexp: "^#?Port 22"
+    line: "Port {{ port }} "
+
+- name: change PermitRootLogin
+  lineinfile:
+    path: /etc/ssh/sshd_config
+    regexp: "^#?PermitRootLogin"
+    line: "PermitRootLogin no"
+
+- name: change PubKeyAuthentication
+  lineinfile:
+    path: /etc/ssh/sshd_config
+    regexp: "^#?PubkeyAuthentication"
+    line: "PubKeyAuthentication yes"
+
+- name: change PasswordAuthentication
+  lineinfile:
+    path: /etc/ssh/sshd_config
+    regexp: "^#?PasswordAuthentication"
+    line: "PasswordAuthentication no"
+
+- name: Restart SSHD to apply changes in sshd_config
+  ansible.builtin.systemd:
+    name: ssh
+    state: restarted
+  become: yes

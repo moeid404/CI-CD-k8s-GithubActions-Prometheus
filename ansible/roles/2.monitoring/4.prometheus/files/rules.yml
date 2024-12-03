@@ -1,0 +1,11 @@
+groups:
+  - name: nodejs_app_alerts
+    rules:
+      - alert: NodeJSAppDown
+        expr: up{job="nodejs_app"} == 0
+        for: 1m
+        labels:
+          severity: critical
+        annotations:
+          summary: "Node.js App is down"
+          description: "The Node.js application is not responding to Prometheus on {{ $labels.instance }}."

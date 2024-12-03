@@ -1,0 +1,25 @@
+- name: Create alertmanager directory
+  file:
+    path: "/etc/alertmanager"
+    state: directory
+
+- name: Copy the alertmanager.yml installation script to the server
+  copy:
+    src: alertmanager.yml
+    dest: /etc/alertmanager/alertmanager.yml
+    mode: '0644'  # Make the script executable
+
+- name: Copy the alertmanager installation script to the server
+  copy:
+    src: alertmanager.sh
+    dest: /tmp/alertmanager.sh
+    mode: '0755'  # Make the script executable
+
+- name: Run the alertmanager installation script
+  command: /tmp/alertmanager.sh
+
+- name: Restart Prometheus service
+  ansible.builtin.systemd:
+    name: prometheus
+    state: restarted
+    enabled: yes

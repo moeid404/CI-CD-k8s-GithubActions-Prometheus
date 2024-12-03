@@ -1,0 +1,15 @@
+---
+# tasks file for 1.provisioning
+- name: Update apt repository
+  apt:
+    update_cache: yes
+
+- name: Ensure required packages are installed on the remote server
+  ansible.builtin.package:
+    name: "{{ item }}"
+    state: present
+  loop:
+    - rsync
+    - procps
+    - vim
+    - net-tools

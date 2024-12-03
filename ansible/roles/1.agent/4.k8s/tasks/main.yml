@@ -1,0 +1,154 @@
+######################################################
+# Docker Install
+######################################################
+- name: Update apt package index
+  apt:
+    update_cache: yes
+
+- name: Ensure curl is installed
+  apt:
+    name: curl
+    state: present
+
+- name: Install required packages for Docker
+  apt:
+    name:
+      - apt-transport-https
+      - ca-certificates
+      - software-properties-common
+    state: present
+
+- name: Add Docker GPG key
+  apt_key:
+    url: https://download.docker.com/linux/ubuntu/gpg
+    state: present
+
+- name: Add Docker APT repository
+  apt_repository:
+    repo: "deb [arch=amd64] https://download.docker.com/linux/ubuntu focal stable"
+    state: present
+    update_cache: yes
+
+- name: Install Docker CE
+  apt:
+    name: docker-ce
+    state: present
+
+- name: Download Docker Compose binary
+  get_url:
+    url: "https://github.com/docker/compose/releases/download/1.28.5/docker-compose-{{ ansible_system|lower }}-{{ ansible_architecture }}"
+    dest: /usr/local/bin/docker-compose
+    mode: '0755'
+
+- name: Verify Docker Compose installation
+  command: docker-compose --version
+  register: docker_compose_version
+  changed_when: false
+
+- debug:
+    msg: "Docker Compose version installed: {{ docker_compose_version.stdout }}"
+
+# Run docker commands withot sudo
+- name: Ensure DOCKER_HOST is set in .bashrc
+  lineinfile:
+    path: "/home/ubuntu/.bashrc"
+    line: 'export DOCKER_HOST=unix:///var/run/docker.sock'
+    state: present
+    insertafter: EOF
+
+- name: Source the .bashrc to apply changes
+  shell: source ~/.bashrc
+  args:
+    executable: /bin/bash
+
+- name: Ensure the docker group exists
+  group:
+    name: docker
+    state: present
+
+- name: Add user to the docker group
+  user:
+    name: "ubuntu"
+    groups: docker
+    append: yes
+
+######################################################
+# K8s
+######################################################
+
+- name: Install kubectl
+  script: kubectl.sh
+
+- name: Install Kind
+  script: kind.sh
+
+- name: Install kind
+  get_url:
+    url: "https://kind.sigs.k8s.io/dl/v0.25.0/kind-linux-amd64"
+    dest: /usr/local/bin/kind
+    mode: '0755'
+  become: yes
+
+- name: Create Kind cluster with Ingress Controller
+  shell: |
+    cat <<EOF | kind create cluster --config=-
+    kind: Cluster
+    apiVersion: kind.x-k8s.io/v1alpha4
+    nodes:
+    - role: control-plane
+      kubeadmConfigPatches:
+      - |
+        kind: InitConfiguration
+        nodeRegistration:
+          kubeletExtraArgs:
+            node-labels: "ingress-ready=true"
+      extraPortMappings:
+      - containerPort: 80
+        hostPort: 80
+        protocol: TCP
+      - containerPort: 443
+        hostPort: 443
+        protocol: TCP
+    EOF
+    kubectl apply -f https://raw.githubusercontent.com/kubernetes/ingress-nginx/main/deploy/static/provider/kind/deploy.yaml
+  args:
+    executable: /bin/bash
+  become: yes
+
+- name: Create a working directory for Kubernetes manifests
+  file:
+    path: /opt/k8s-manifests
+    state: directory
+    mode: '0755'
+
+- name: Copy Kubernetes manifests to the remote server
+  copy:
+    src: "{{ item.src }}"
+    dest: "{{ item.dest }}"
+  loop:
+    - { src: "deployment.yml", dest: "/opt/k8s-manifests/deployment.yml" }
+    - { src: "service.yml", dest: "/opt/k8s-manifests/service.yml" }
+    - { src: "ingress.yml", dest: "/opt/k8s-manifests/ingress.yml" }
+
+# Purpose: Checks if the Ingress Controller deployment is fully initialized and ready to handle ingress resources.
+# Runs kubectl rollout status to monitor the rollout of the deployment.
+# Looks for the phrase "successfully rolled out" in the command output to confirm readiness.
+- name: Ensure Ingress Controller is ready
+  shell: |
+    kubectl rollout status deployment/ingress-nginx-controller -n ingress-nginx
+  register: ingress_controller_status
+  until: ingress_controller_status.stdout.find("successfully rolled out") != -1
+  retries: 5
+  delay: 10
+
+- name: Apply Kubernetes manifests for Node Exporter and App
+  command: "sudo kubectl apply -f {{ item }} {{ '--validate=false' if 'ingress.yml' in item else '' }}"
+  loop:
+    - /opt/k8s-manifests/deployment.yml
+    - /opt/k8s-manifests/service.yml
+    - /opt/k8s-manifests/ingress.yml
+  register: kubectl_output
+  retries: 3
+  delay: 10
+  failed_when: kubectl_output.rc != 0
+

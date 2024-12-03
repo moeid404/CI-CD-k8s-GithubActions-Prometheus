@@ -1,0 +1,29 @@
+- name: Copy the Prometheus installation script to the server
+  copy:
+    src: install_prometheus.sh
+    dest: /tmp/install_prometheus.sh
+    mode: '0755'  # Make the script executable
+
+- name: Run the Prometheus installation script
+  command: /tmp/install_prometheus.sh
+
+- name: Copy prometheus.yml template to /etc/prometheus/
+  template:
+    src: templates/prometheus.yml.j2
+    dest: /etc/prometheus/prometheus.yml
+    owner: prometheus
+    group: prometheus
+    mode: '0644'
+
+- name: Copy the rules.yml installation script to the server
+  copy:
+    src: rules.yml
+    dest: /etc/prometheus/rules.yml
+    mode: '0644'  # Make the script executable
+
+- name: Restart Prometheus service
+  ansible.builtin.systemd:
+    name: prometheus
+    state: restarted
+    enabled: yes
+

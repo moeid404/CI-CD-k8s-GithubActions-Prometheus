@@ -1,0 +1,19 @@
+global:
+  resolve_timeout: 1m # Faster resolution timeout
+
+route:
+  receiver: slack-notifications
+  group_wait: 5s        # Reduce waiting time for the first notification
+  group_interval: 1m    # Send notifications every minute for the same group
+  repeat_interval: 10m  # Resend unresolved alert notifications every 10 minutes
+
+receivers:
+- name: slack-notifications
+  slack_configs:
+  - api_url: 'https://hooks.slack.com/services/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'
+    channel: '#project' # Replace with your Slack channel
+    send_resolved: true
+    text: |
+      *Alert:* {{ .CommonAnnotations.summary }}
+      *Description:* {{ .CommonAnnotations.description }}
+      *Severity:* {{ .CommonLabels.severity }}
